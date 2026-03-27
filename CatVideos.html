@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catvideos</title>
+    <style>
+        :root { --netflix-red: #E50914; --netflix-black: #000; --glass: rgba(255, 255, 255, 0.1); }
+        body, html { margin: 0; padding: 0; background: var(--netflix-black); color: white; font-family: 'Segoe UI', sans-serif; height: 100vh; overflow: hidden; }
+
+        header { position: fixed; top: 0; width: 100%; z-index: 1000; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent); box-sizing: border-box; }
+        .logo { font-family: 'Arial Black', sans-serif; font-size: 26px; color: white; text-decoration: none; }
+        .logo span { color: var(--netflix-red); }
+
+        .btn-glass { background: var(--glass); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px 20px; border-radius: 25px; cursor: pointer; backdrop-filter: blur(10px); font-weight: 600; }
+
+        #fyp-container { height: 100vh; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; }
+        #fyp-container::-webkit-scrollbar { display: none; }
+
+        .video-snap { height: 100vh; width: 100%; scroll-snap-align: start; display: flex; justify-content: center; align-items: center; }
+        .video-box { position: relative; width: 90%; max-width: 800px; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #111; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        
+        /* La vidéo est maintenant un bouton géant */
+        .video-box video { width: 100%; height: 100%; object-fit: cover; cursor: pointer; background: #000; }
+
+        .video-info { position: absolute; bottom: 0; left: 0; right: 0; padding: 40px 20px 20px; background: linear-gradient(transparent, rgba(0,0,0,0.9)); pointer-events: none; }
+        .views-count { background: var(--netflix-red); padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-bottom: 8px; display: inline-block; }
+        .author-tag { color: #ccc; margin: 0; font-size: 14px; }
+
+        .delete-btn { position: absolute; bottom: 20px; right: 20px; background: rgba(229, 9, 20, 0.8); color: white; border: none; padding: 10px 15px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: bold; pointer-events: auto; z-index: 10; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); justify-content: center; align-items: center; z-index: 2000; }
+        .modal-content { background: #181818; padding: 30px; border-radius: 20px; width: 90%; max-width: 450px; border: 1px solid #333; text-align: center; }
+        .modal-content input { width: 100%; padding: 12px; margin-bottom: 15px; background: #222; border: 1px solid #444; border-radius: 8px; color: white; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+<header>
+    <a href="#" class="logo">Cat<span>Videos</span></a>
+    <div style="display:flex; gap:10px;">
+        <button class="btn-glass" onclick="document.getElementById('uploadModal').style.display='flex'">+ Upload</button>
+        <button class="btn-glass" id="user-btn" onclick="handleUserClick()">Connexion</button>
+    </div>
+</header>
+
+<div id="fyp-container"></div>
+
+<div id="authModal" class="modal">
+    <div class="modal-content">
+        <h2 id="auth-title">Connexion</h2>
+        <input type="text" id="reg-pseudo" placeholder="Pseudo" style="display:none;">
+        <input type="email" id="auth-email" placeholder="Email">
+        <input type="password" id="auth-pass" placeholder="Mot de passe">
+        <button class="btn-glass" style="width:100%; background:var(--netflix-red);" onclick="processAuth()">Continuer</button>
+        <p id="toggle-link" style="font-size:12px; color:#777; margin-top:15px; cursor:pointer;" onclick="toggleAuth()">Besoin d'un compte ? Inscris-toi</p>
+        <button onclick="document.getElementById('authModal').style.display='none'" style="background:none; border:none; color:#555; margin-top:10px; cursor:pointer;">Fermer</button>
+    </div>
+</div>
+
+<div id="uploadModal" class="modal">
+    <div class="modal-content">
+        <h2>Publier une vidéo</h2>
+        <input type="text" id="up-title" placeholder="Titre">
+        <input type="text" id="up-url" placeholder="Lien MP4 Archive.org">
+        <input type="text" id="up-img-url" placeholder="Lien Image Miniature">
+        <button class="btn-glass" style="width:100%; background:var(--netflix-red);" onclick="processUpload()">Publier</button>
+        <button onclick="document.getElementById('uploadModal').style.display='none'" style="background:none; border:none; color:#555; margin-top:15px; cursor:pointer;">Annuler</button>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, increment, getDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyCF1VB_5kVLCJM8u1JGQHgbCOnWk-caYYQ",
+        authDomain: "catvideos-dd625.firebaseapp.com",
+        projectId: "catvideos-dd625",
+        messagingSenderId: "1099286329920",
+        appId: "1:1099286329920:web:ecc24c86982fdd028f3da5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let myName = "Anonyme";
+    let myUID = null;
+    let isRegister = false;
+
+    // AUTH FUNCTIONS
+    window.handleUserClick = () => {
+        if(myUID) { if(confirm("Déconnexion ?")) signOut(auth).then(() => location.reload()); }
+        else { document.getElementById('authModal').style.display='flex'; }
+    };
+
+    window.toggleAuth = () => {
+        isRegister = !isRegister;
+        document.getElementById('reg-pseudo').style.display = isRegister ? 'block' : 'none';
+        document.getElementById('auth-title').innerText = isRegister ? 'Inscription' : 'Connexion';
+        document.getElementById('toggle-link').innerText = isRegister ? "Tu as déjà un compte ? Connecte-toi" : "Besoin d'un compte ? Inscris-toi";
+    };
+
+    window.processAuth = async () => {
+        const email = document.getElementById('auth-email').value;
+        const pass = document.getElementById('auth-pass').value;
+        try {
+            if(isRegister) {
+                const res = await createUserWithEmailAndPassword(auth, email, pass);
+                await setDoc(doc(db, "users", res.user.uid), { displayName: document.getElementById('reg-pseudo').value || "User" });
+            } else { await signInWithEmailAndPassword(auth, email, pass); }
+            location.reload();
+        } catch(e) { alert(e.message); }
+    };
+
+    onAuthStateChanged(auth, async (user) => { 
+        if(user) { 
+            myUID = user.uid;
+            const snap = await getDoc(doc(db, "users", user.uid));
+            myName = snap.exists() ? snap.data().displayName : user.email.split('@')[0];
+            document.getElementById('user-btn').innerText = myName; 
+        } 
+    });
+
+    // UPLOAD
+    window.processUpload = async () => {
+        const title = document.getElementById('up-title').value;
+        let vUrl = document.getElementById('up-url').value;
+        let iUrl = document.getElementById('up-img-url').value;
+        if(!myUID || !title || !vUrl || !iUrl) return alert("Erreur saisie");
+        
+        if(vUrl.includes("details/")) vUrl = vUrl.replace("details/", "download/");
+        if(iUrl.includes("details/")) iUrl = iUrl.replace("details/", "download/");
+
+        await addDoc(collection(db, "videos"), {
+            title, url: vUrl, img: iUrl, views: 0, 
+            authorName: myName, authorUID: myUID, date: new Date()
+        });
+        location.reload();
+    };
+
+    // DISPLAY FLUX
+    onSnapshot(query(collection(db, "videos"), orderBy("date", "desc")), (snap) => {
+        const container = document.getElementById('fyp-container');
+        container.innerHTML = "";
+        snap.forEach(docSnap => {
+            const v = docSnap.data();
+            const div = document.createElement('div');
+            div.className = "video-snap";
+            div.innerHTML = `
+                <div class="video-box">
+                    <video poster="${v.img}" loop muted autoplay playsinline onclick="handleVideoClick('${v.url}', '${docSnap.id}', '${v.authorUID}')">
+                        <source src="${v.url}" type="video/mp4">
+                    </video>
+                    <div class="video-info">
+                        <div class="views-count">${v.views} CLICS</div>
+                        <h3>${v.title}</h3>
+                        <p class="author-tag">@${v.authorName}</p>
+                    </div>
+                    ${myUID === v.authorUID ? `<button class="delete-btn" onclick="deleteVideo('${docSnap.id}')">Supprimer</button>` : ''}
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    });
+
+    // ACTION AU CLIC SUR VIDÉO
+    window.handleVideoClick = async (url, videoId, authorUID) => {
+        // 1. Incrémenter les vues (clics)
+        if (myUID !== authorUID) {
+            await updateDoc(doc(db, "videos", videoId), { views: increment(1) });
+        }
+        // 2. Ouvrir le lien
+        window.open(url, '_blank');
+    };
+
+    window.deleteVideo = async (id) => { if(confirm("Supprimer ?")) await deleteDoc(doc(db, "videos", id)); };
+</script>
+</body>
+</html>
