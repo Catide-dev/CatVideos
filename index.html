@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catvideos</title>
+    <title>CatVideos - FYP Link Archive</title>
     <style>
         :root { --netflix-red: #E50914; --netflix-black: #000; --glass: rgba(255, 255, 255, 0.1); }
         body, html { margin: 0; padding: 0; background: var(--netflix-black); color: white; font-family: 'Segoe UI', sans-serif; height: 100vh; overflow: hidden; }
@@ -20,18 +20,25 @@
         .video-snap { height: 100vh; width: 100%; scroll-snap-align: start; display: flex; justify-content: center; align-items: center; }
         .video-box { position: relative; width: 90%; max-width: 800px; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #111; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
         
-        /* La vidéo est maintenant un bouton géant */
+        /* La vidéo est un lien géant */
         .video-box video { width: 100%; height: 100%; object-fit: cover; cursor: pointer; background: #000; }
 
         .video-info { position: absolute; bottom: 0; left: 0; right: 0; padding: 40px 20px 20px; background: linear-gradient(transparent, rgba(0,0,0,0.9)); pointer-events: none; }
         .views-count { background: var(--netflix-red); padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-bottom: 8px; display: inline-block; }
-        .author-tag { color: #ccc; margin: 0; font-size: 14px; }
 
-        .delete-btn { position: absolute; bottom: 20px; right: 20px; background: rgba(229, 9, 20, 0.8); color: white; border: none; padding: 10px 15px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: bold; pointer-events: auto; z-index: 10; }
+        .delete-btn { position: absolute; bottom: 20px; right: 20px; background: rgba(229, 9, 20, 0.8); color: white; border: none; padding: 10px 15px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: bold; pointer-events: auto; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); justify-content: center; align-items: center; z-index: 2000; }
-        .modal-content { background: #181818; padding: 30px; border-radius: 20px; width: 90%; max-width: 450px; border: 1px solid #333; text-align: center; }
+        .modal-content { background: #181818; padding: 30px; border-radius: 20px; width: 90%; max-width: 450px; border: 1px solid #333; text-align: center; max-height: 90vh; overflow-y: auto; }
         .modal-content input { width: 100%; padding: 12px; margin-bottom: 15px; background: #222; border: 1px solid #444; border-radius: 8px; color: white; box-sizing: border-box; }
+        
+        /* Bloc Tutoriel */
+        .tuto-box { background: #222; padding: 15px; border-radius: 10px; text-align: left; margin-bottom: 20px; border-left: 4px solid var(--netflix-red); }
+        .tuto-box h4 { margin: 0 0 10px 0; color: var(--netflix-red); font-size: 13px; text-transform: uppercase; }
+        .tuto-box p { font-size: 11px; margin: 5px 0; color: #ccc; line-height: 1.4; }
+        .tuto-box b { color: white; }
+
+        .hint { font-size: 10px; color: var(--netflix-red); text-align: left; margin: -10px 0 15px 5px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -49,7 +56,7 @@
 <div id="authModal" class="modal">
     <div class="modal-content">
         <h2 id="auth-title">Connexion</h2>
-        <input type="text" id="reg-pseudo" placeholder="Pseudo" style="display:none;">
+        <input type="text" id="reg-pseudo" placeholder="Pseudo (Inscription)" style="display:none;">
         <input type="email" id="auth-email" placeholder="Email">
         <input type="password" id="auth-pass" placeholder="Mot de passe">
         <button class="btn-glass" style="width:100%; background:var(--netflix-red);" onclick="processAuth()">Continuer</button>
@@ -61,11 +68,21 @@
 <div id="uploadModal" class="modal">
     <div class="modal-content">
         <h2>Publier une vidéo</h2>
-        <input type="text" id="up-title" placeholder="Titre">
-        <input type="text" id="up-url" placeholder="Lien MP4 Archive.org">
+        
+        <div class="tuto-box">
+            <h4>📖 Tutoriel Archive.org</h4>
+            <p>1. Upload ta vidéo (mp4) et ton image (jpg) sur <b>Archive.org</b>.</p>
+            <p>2. Dans "Download Options", fais un <b>clic droit</b> sur "MPEG4" -> "Copier l'adresse du lien".</p>
+            <p>3. Fais pareil pour ton <b>Image</b> et colle les deux liens ci-dessous.</p>
+        </div>
+
+        <input type="text" id="up-title" placeholder="Titre de la vidéo">
+        <input type="text" id="up-url" placeholder="Lien Vidéo MP4">
         <input type="text" id="up-img-url" placeholder="Lien Image Miniature">
-        <button class="btn-glass" style="width:100%; background:var(--netflix-red);" onclick="processUpload()">Publier</button>
-        <button onclick="document.getElementById('uploadModal').style.display='none'" style="background:none; border:none; color:#555; margin-top:15px; cursor:pointer;">Annuler</button>
+        <p class="hint">Obligatoire : L'image doit être en 1920x1080.</p>
+        
+        <button class="btn-glass" id="btn-submit-up" style="width:100%; background:var(--netflix-red);" onclick="processUpload()">Publier</button>
+        <button onclick="document.getElementById('uploadModal').style.display='none'" style="background:none; border:none; color:#555; cursor:pointer; margin-top:15px;">Annuler</button>
     </div>
 </div>
 
@@ -90,7 +107,6 @@
     let myUID = null;
     let isRegister = false;
 
-    // AUTH FUNCTIONS
     window.handleUserClick = () => {
         if(myUID) { if(confirm("Déconnexion ?")) signOut(auth).then(() => location.reload()); }
         else { document.getElementById('authModal').style.display='flex'; }
@@ -100,7 +116,7 @@
         isRegister = !isRegister;
         document.getElementById('reg-pseudo').style.display = isRegister ? 'block' : 'none';
         document.getElementById('auth-title').innerText = isRegister ? 'Inscription' : 'Connexion';
-        document.getElementById('toggle-link').innerText = isRegister ? "Tu as déjà un compte ? Connecte-toi" : "Besoin d'un compte ? Inscris-toi";
+        document.getElementById('toggle-link').innerText = isRegister ? "Déjà un compte ? Connecte-toi" : "Pas de compte ? Inscris-toi";
     };
 
     window.processAuth = async () => {
@@ -109,7 +125,7 @@
         try {
             if(isRegister) {
                 const res = await createUserWithEmailAndPassword(auth, email, pass);
-                await setDoc(doc(db, "users", res.user.uid), { displayName: document.getElementById('reg-pseudo').value || "User" });
+                await setDoc(doc(db, "users", res.user.uid), { displayName: document.getElementById('reg-pseudo').value || "Utilisateur" });
             } else { await signInWithEmailAndPassword(auth, email, pass); }
             location.reload();
         } catch(e) { alert(e.message); }
@@ -124,24 +140,33 @@
         } 
     });
 
-    // UPLOAD
     window.processUpload = async () => {
         const title = document.getElementById('up-title').value;
         let vUrl = document.getElementById('up-url').value;
         let iUrl = document.getElementById('up-img-url').value;
-        if(!myUID || !title || !vUrl || !iUrl) return alert("Erreur saisie");
-        
+
+        if(!myUID || !title || !vUrl || !iUrl) return alert("Champs vides !");
+
+        // Auto-correction Archive.org
         if(vUrl.includes("details/")) vUrl = vUrl.replace("details/", "download/");
         if(iUrl.includes("details/")) iUrl = iUrl.replace("details/", "download/");
 
-        await addDoc(collection(db, "videos"), {
-            title, url: vUrl, img: iUrl, views: 0, 
-            authorName: myName, authorUID: myUID, date: new Date()
-        });
-        location.reload();
+        const image = new Image();
+        image.onload = async function() {
+            if (this.width !== 1920 || this.height !== 1080) {
+                alert("Format image incorrect (1920x1080 requis).");
+                return;
+            }
+            await addDoc(collection(db, "videos"), {
+                title, url: vUrl, img: iUrl, views: 0, 
+                authorName: myName, authorUID: myUID, date: new Date()
+            });
+            document.getElementById('uploadModal').style.display='none';
+            alert("Vidéo publiée !");
+        };
+        image.src = iUrl;
     };
 
-    // DISPLAY FLUX
     onSnapshot(query(collection(db, "videos"), orderBy("date", "desc")), (snap) => {
         const container = document.getElementById('fyp-container');
         container.innerHTML = "";
@@ -151,7 +176,7 @@
             div.className = "video-snap";
             div.innerHTML = `
                 <div class="video-box">
-                    <video poster="${v.img}" loop muted autoplay playsinline onclick="handleVideoClick('${v.url}', '${docSnap.id}', '${v.authorUID}')">
+                    <video poster="${v.img}" loop muted autoplay playsinline onclick="handleLinkClick('${v.url}', '${docSnap.id}', '${v.authorUID}')">
                         <source src="${v.url}" type="video/mp4">
                     </video>
                     <div class="video-info">
@@ -166,13 +191,8 @@
         });
     });
 
-    // ACTION AU CLIC SUR VIDÉO
-    window.handleVideoClick = async (url, videoId, authorUID) => {
-        // 1. Incrémenter les vues (clics)
-        if (myUID !== authorUID) {
-            await updateDoc(doc(db, "videos", videoId), { views: increment(1) });
-        }
-        // 2. Ouvrir le lien
+    window.handleLinkClick = async (url, videoId, authorUID) => {
+        if (myUID !== authorUID) await updateDoc(doc(db, "videos", videoId), { views: increment(1) });
         window.open(url, '_blank');
     };
 
